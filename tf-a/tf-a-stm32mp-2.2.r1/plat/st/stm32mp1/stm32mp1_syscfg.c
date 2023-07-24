@@ -7,15 +7,16 @@
 #include <platform_def.h>
 
 #include <common/debug.h>
-#include <drivers/st/bsec.h>
+#include <drivers/st/stm32mp1_clk.h>
 #include <drivers/st/stpmic1.h>
 #include <lib/mmio.h>
 
+#include <stm32mp_common.h>
 #include <stm32mp_dt.h>
 #include <stm32mp1_private.h>
 
 /*
- * SYSCFG REGISTER OFFSET (base relative)
+ * SYSCFG register offsets (base relative)
  */
 #define SYSCFG_BOOTR				0x00U
 #define SYSCFG_IOCTRLSETR			0x18U
@@ -53,6 +54,8 @@
 #define SYSCFG_CMPCR_RAPSRC			GENMASK(23, 20)
 #define SYSCFG_CMPCR_ANSRC_SHIFT		24
 
+#define SYSCFG_CMPCR_READY_TIMEOUT_US		10000U
+
 /*
  * SYSCFG_CMPENSETR Register
  */
@@ -61,20 +64,20 @@
 void stm32mp1_syscfg_init(void)
 {
 	uint32_t bootr;
-	uint32_t otp = 0;
+	uint32_t otp_value;
 	uint32_t vdd_voltage;
-	uintptr_t syscfg_base = dt_get_syscfg_base();
+	bool product_below_2v5;
 
 	/*
 	 * Interconnect update : select master using the port 1.
 	 * LTDC = AXI_M9.
 	 */
-	mmio_write_32(syscfg_base + SYSCFG_ICNR, SYSCFG_ICNR_AXI_M9);
+	mmio_write_32(SYSCFG_BASE + SYSCFG_ICNR, SYSCFG_ICNR_AXI_M9);
 
 	/* Disable Pull-Down for boot pin connected to VDD */
-	bootr = mmio_read_32(syscfg_base + SYSCFG_BOOTR) &
+	bootr = mmio_read_32(SYSCFG_BASE + SYSCFG_BOOTR) &
 		SYSCFG_BOOTR_BOOT_MASK;
-	mmio_clrsetbits_32(syscfg_base + SYSCFG_BOOTR, SYSCFG_BOOTR_BOOTPD_MASK,
+	mmio_clrsetbits_32(SYSCFG_BASE + SYSCFG_BOOTR, SYSCFG_BOOTR_BOOTPD_MASK,
 			   bootr << SYSCFG_BOOTR_BOOTPD_SHIFT);
 
 	/*
@@ -92,11 +95,11 @@ void stm32mp1_syscfg_init(void)
 	 *   => TF-A enables the low power mode only if VDD < 2.7V (in DT)
 	 *      but this value needs to be consistent with board design.
 	 */
-	if (bsec_read_otp(&otp, HW2_OTP) != BSEC_OK) {
+	if (stm32_get_otp_value(HW2_OTP, &otp_value) != 0) {
 		panic();
 	}
 
-	otp = otp & HW2_OTP_PRODUCT_BELOW_2V5;
+	product_below_2v5 = (otp_value & HW2_OTP_PRODUCT_BELOW_2V5) != 0U;
 
 	/* Get VDD supply */
 	vdd_voltage = dt_get_pwr_vdd_voltage();
@@ -105,18 +108,18 @@ void stm32mp1_syscfg_init(void)
 	if (vdd_voltage == 0U) {
 		WARN("VDD unknown");
 	} else if (vdd_voltage < 2700000U) {
-		mmio_write_32(syscfg_base + SYSCFG_IOCTRLSETR,
+		mmio_write_32(SYSCFG_BASE + SYSCFG_IOCTRLSETR,
 			      SYSCFG_IOCTRLSETR_HSLVEN_TRACE |
 			      SYSCFG_IOCTRLSETR_HSLVEN_QUADSPI |
 			      SYSCFG_IOCTRLSETR_HSLVEN_ETH |
 			      SYSCFG_IOCTRLSETR_HSLVEN_SDMMC |
 			      SYSCFG_IOCTRLSETR_HSLVEN_SPI);
 
-		if (otp == 0U) {
+		if (!product_below_2v5) {
 			INFO("Product_below_2v5=0: HSLVEN protected by HW\n");
 		}
 	} else {
-		if (otp != 0U) {
+		if (product_below_2v5) {
 			ERROR("Product_below_2v5=1:\n");
 			ERROR("\tHSLVEN update is destructive,\n");
 			ERROR("\tno update as VDD > 2.7V\n");
@@ -129,29 +132,37 @@ void stm32mp1_syscfg_init(void)
 
 void stm32mp1_syscfg_enable_io_compensation(void)
 {
-	uintptr_t syscfg_base = dt_get_syscfg_base();
+	uint64_t start;
 
 	/*
 	 * Activate automatic I/O compensation.
 	 * Warning: need to ensure CSI enabled and ready in clock driver.
 	 * Enable non-secure clock, we assume non-secure is suspended.
 	 */
-	stm32mp1_clk_enable_non_secure(SYSCFG);
+	stm32mp1_clk_force_enable(SYSCFG);
 
-	mmio_setbits_32(syscfg_base + SYSCFG_CMPENSETR,
+	mmio_setbits_32(SYSCFG_BASE + SYSCFG_CMPENSETR,
 			SYSCFG_CMPENSETR_MPU_EN);
 
-	while ((mmio_read_32(syscfg_base + SYSCFG_CMPCR) &
+	start = timeout_init_us(SYSCFG_CMPCR_READY_TIMEOUT_US);
+
+	while ((mmio_read_32(SYSCFG_BASE + SYSCFG_CMPCR) &
 		SYSCFG_CMPCR_READY) == 0U) {
-		;
+		if (timeout_elapsed(start)) {
+			/*
+			 * Failure on IO compensation enable is not a issue:
+			 * warn only.
+			 */
+			WARN("IO compensation cell not ready\n");
+			break;
+		}
 	}
 
-	mmio_clrbits_32(syscfg_base + SYSCFG_CMPCR, SYSCFG_CMPCR_SW_CTRL);
+	mmio_clrbits_32(SYSCFG_BASE + SYSCFG_CMPCR, SYSCFG_CMPCR_SW_CTRL);
 }
 
 void stm32mp1_syscfg_disable_io_compensation(void)
 {
-	uintptr_t syscfg_base = dt_get_syscfg_base();
 	uint32_t value;
 
 	/*
@@ -160,21 +171,19 @@ void stm32mp1_syscfg_disable_io_compensation(void)
 	 * requested for other usages and always OFF in STANDBY.
 	 * Disable non-secure SYSCFG clock, we assume non-secure is suspended.
 	 */
-	value = mmio_read_32(syscfg_base + SYSCFG_CMPCR) >>
+	value = mmio_read_32(SYSCFG_BASE + SYSCFG_CMPCR) >>
 	      SYSCFG_CMPCR_ANSRC_SHIFT;
 
-	mmio_clrbits_32(syscfg_base + SYSCFG_CMPCR,
+	mmio_clrbits_32(SYSCFG_BASE + SYSCFG_CMPCR,
 			SYSCFG_CMPCR_RANSRC | SYSCFG_CMPCR_RAPSRC);
 
-	value = mmio_read_32(syscfg_base + SYSCFG_CMPCR) |
+	value = mmio_read_32(SYSCFG_BASE + SYSCFG_CMPCR) |
 		(value << SYSCFG_CMPCR_RANSRC_SHIFT);
 
-	mmio_write_32(syscfg_base + SYSCFG_CMPCR, value);
+	mmio_write_32(SYSCFG_BASE + SYSCFG_CMPCR, value | SYSCFG_CMPCR_SW_CTRL);
 
-	mmio_setbits_32(syscfg_base + SYSCFG_CMPCR, SYSCFG_CMPCR_SW_CTRL);
-
-	mmio_clrbits_32(syscfg_base + SYSCFG_CMPENSETR,
+	mmio_clrbits_32(SYSCFG_BASE + SYSCFG_CMPENSETR,
 			SYSCFG_CMPENSETR_MPU_EN);
 
-	stm32mp1_clk_disable_non_secure(SYSCFG);
+	stm32mp1_clk_force_disable(SYSCFG);
 }

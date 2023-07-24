@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2020, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -60,7 +60,6 @@ static inline void _tzc400_write_gate_keeper(uintptr_t base, unsigned int val)
 					GATE_KEEPER_OS_SHIFT) &		\
 					GATE_KEEPER_OS_MASK)
 
-
 /* Define common core functions used across different TZC peripherals. */
 DEFINE_TZC_COMMON_WRITE_ACTION(400, 400)
 DEFINE_TZC_COMMON_WRITE_REGION_BASE(400, 400)
@@ -70,8 +69,50 @@ DEFINE_TZC_COMMON_WRITE_REGION_ID_ACCESS(400, 400)
 DEFINE_TZC_COMMON_CONFIGURE_REGION0(400)
 DEFINE_TZC_COMMON_CONFIGURE_REGION(400)
 
-static unsigned int _tzc400_get_gate_keeper(uintptr_t base,
-				unsigned int filter)
+static inline void tzc400_clear_it(long base, uint32_t filter)
+{
+	mmio_write_32(base + INT_CLEAR, 1U << filter);
+}
+
+static inline uint32_t tzc400_get_int_by_filter(long base, uint32_t filter)
+{
+	return (mmio_read_32(base + INT_STATUS) & (1U << filter));
+}
+
+#if DEBUG
+static long tzc400_get_fail_address(long base, uint32_t filter)
+{
+	long fail_address;
+
+	if (filter != 0U) {
+		fail_address = mmio_read_32(base + FAIL_ADDRESS_LOW_OFF +
+					    FILTER_OFFSET);
+#ifdef __aarch64__
+		fail_address += mmio_read_32(base + FAIL_ADDRESS_HIGH_OFF +
+					     FILTER_OFFSET) << 32;
+#endif
+	} else {
+		fail_address = mmio_read_32(base + FAIL_ADDRESS_LOW_OFF);
+#ifdef __aarch64__
+		fail_address +=
+			mmio_read_32(base + FAIL_ADDRESS_HIGH_OFF) << 32;
+#endif
+	}
+
+	return fail_address;
+}
+#endif
+
+static inline uint32_t tzc400_get_fail_control(long base, uint32_t filter)
+{
+	if (filter != 0U) {
+		return mmio_read_32(base + FAIL_CONTROL_OFF + FILTER_OFFSET);
+	} else {
+		return mmio_read_32(base + FAIL_CONTROL_OFF);
+	}
+}
+
+static unsigned int _tzc400_get_gate_keeper(uintptr_t base, unsigned int filter)
 {
 	unsigned int open_status;
 
@@ -81,9 +122,8 @@ static unsigned int _tzc400_get_gate_keeper(uintptr_t base,
 }
 
 /* This function is not MP safe. */
-static void _tzc400_set_gate_keeper(uintptr_t base,
-				unsigned int filter,
-				int val)
+static void _tzc400_set_gate_keeper(uintptr_t base, unsigned int filter,
+				    int val)
 {
 	unsigned int open_status;
 
@@ -151,7 +191,7 @@ void tzc400_init(uintptr_t base)
  * changed. This function only changes the access permissions.
  */
 void tzc400_configure_region0(unsigned int sec_attr,
-			   unsigned int ns_device_access)
+			      unsigned int ns_device_access)
 {
 	assert(tzc400.base != 0U);
 	assert(sec_attr <= TZC_REGION_S_RDWR);
@@ -168,11 +208,11 @@ void tzc400_configure_region0(unsigned int sec_attr,
  * for this region (see comment for that function).
  */
 void tzc400_configure_region(unsigned int filters,
-			  unsigned int region,
-			  unsigned long long region_base,
-			  unsigned long long region_top,
-			  unsigned int sec_attr,
-			  unsigned int nsaid_permissions)
+			     unsigned int region,
+			     unsigned long long region_base,
+			     unsigned long long region_top,
+			     unsigned int sec_attr,
+			     unsigned int nsaid_permissions)
 {
 	assert(tzc400.base != 0U);
 
@@ -185,7 +225,7 @@ void tzc400_configure_region(unsigned int filters,
 	 * the max and expected case.
 	 */
 	assert((region_top <= (UINT64_MAX >> (64U - tzc400.addr_width))) &&
-		(region_base < region_top));
+	       (region_base < region_top));
 
 	/* region_base and (region_top + 1) must be 4KB aligned */
 	assert(((region_base | (region_top + 1U)) & (4096U - 1U)) == 0U);
@@ -193,8 +233,7 @@ void tzc400_configure_region(unsigned int filters,
 	assert(sec_attr <= TZC_REGION_S_RDWR);
 
 	_tzc400_configure_region(tzc400.base, filters, region, region_base,
-						region_top,
-						sec_attr, nsaid_permissions);
+				 region_top, sec_attr, nsaid_permissions);
 }
 
 void tzc400_enable_filters(void)
@@ -217,8 +256,8 @@ void tzc400_enable_filters(void)
 			 * See the 'ARM (R) CoreLink TM TZC-400 TrustZone (R)
 			 * Address Space Controller' Technical Reference Manual.
 			 */
-			ERROR("TZC-400 : Filter %d Gatekeeper already"
-				" enabled.\n", filter);
+			ERROR("TZC-400: Filter %d Gatekeeper already enabled\n",
+			      filter);
 			panic();
 		}
 		_tzc400_set_gate_keeper(tzc400.base, filter, 1);
@@ -237,4 +276,80 @@ void tzc400_disable_filters(void)
 	 */
 	for (filter = 0; filter < tzc400.num_filters; filter++)
 		_tzc400_set_gate_keeper(tzc400.base, filter, 0);
+}
+
+void tzc400_clear_all_interrupts(void)
+{
+	unsigned int filter;
+
+	assert(tzc400.base != 0U);
+	for (filter = 0U; filter < tzc400.num_filters; filter++) {
+		mmio_write_32(tzc400.base + INT_CLEAR, 1U << filter);
+	}
+}
+
+int tzc400_is_pending_interrupt(void)
+{
+	unsigned int filter;
+
+	assert(tzc400.base != 0U);
+	for (filter = 0U; filter < tzc400.num_filters; filter++) {
+		if (mmio_read_32(tzc400.base + INT_STATUS) & (1U << filter)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+void tzc400_it_handler(void)
+{
+	uint32_t filter;
+	uint32_t filter_it_pending = tzc400.num_filters;
+	uint32_t control_fail;
+#if DEBUG
+	long address_fail;
+#endif
+
+	assert(tzc400.base != 0U);
+
+	/* first display information conerning the fault access */
+	for (filter = 0U; (filter < tzc400.num_filters) &&
+	     (filter_it_pending == tzc400.num_filters); filter++) {
+		if (tzc400_get_int_by_filter(tzc400.base, filter)) {
+			filter_it_pending =  filter;
+		}
+	}
+
+	if (filter_it_pending == tzc400.num_filters) {
+		ERROR("Error no IT pending!");
+		panic();
+	}
+
+#if DEBUG
+	address_fail = tzc400_get_fail_address(tzc400.base, filter_it_pending);
+	ERROR("Illegal access to 0x%lx in :\n", address_fail);
+#endif
+
+	control_fail = tzc400_get_fail_control(tzc400.base, filter_it_pending);
+
+	if ((control_fail & FAIL_CONTROL_NS_SHIFT) == FAIL_CONTROL_NS_SECURE) {
+		ERROR("\tNon-Secure\n");
+	} else {
+		ERROR("\tSecure\n");
+	}
+
+	if ((control_fail & FAIL_CONTROL_PRIV_SHIFT) ==
+	    FAIL_CONTROL_PRIV_PRIV) {
+		ERROR("\tPrivilege\n");
+	} else {
+		ERROR("\tUnprivilege\n");
+	}
+
+	if ((control_fail & FAIL_CONTROL_DIR_SHIFT) == FAIL_CONTROL_DIR_READ) {
+		ERROR("\tRead\n");
+	} else {
+		ERROR("\tWrite\n");
+	}
+
+	tzc400_clear_it(tzc400.base, filter_it_pending);
 }

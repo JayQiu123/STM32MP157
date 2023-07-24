@@ -1,9 +1,10 @@
 /*
- * Copyright (c) 2016-2019, STMicroelectronics - All Rights Reserved
+ * Copyright (c) 2016-2020, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <errno.h>
 #include <string.h>
 
 #include <common/debug.h>
@@ -419,6 +420,10 @@ static const uint16_t vref_ddr_voltage_table[] = {
 	3300,
 };
 
+static const uint16_t fixed_5v_voltage_table[] = {
+	5000,
+};
+
 /* Table of Regulators in PMIC SoC */
 static const struct regul_struct regulators_table[] = {
 	{
@@ -528,6 +533,27 @@ static const struct regul_struct regulators_table[] = {
 		.mask_reset_reg	= MASK_RESET_LDO_REG,
 		.mask_reset	= VREF_DDR_MASK_RESET,
 	},
+	{
+		.dt_node_name	= "boost",
+		.voltage_table	= fixed_5v_voltage_table,
+		.voltage_table_size = ARRAY_SIZE(fixed_5v_voltage_table),
+		.control_reg	= USB_CONTROL_REG,
+		.mask_reset	= BOOST_ENABLED,
+	},
+	{
+		.dt_node_name	= "pwr_sw1",
+		.voltage_table	= fixed_5v_voltage_table,
+		.voltage_table_size = ARRAY_SIZE(fixed_5v_voltage_table),
+		.control_reg	= USB_CONTROL_REG,
+		.mask_reset	= USBSW_OTG_SWITCH_ENABLED,
+	},
+	{
+		.dt_node_name	= "pwr_sw2",
+		.voltage_table	= fixed_5v_voltage_table,
+		.voltage_table_size = ARRAY_SIZE(fixed_5v_voltage_table),
+		.control_reg	= USB_CONTROL_REG,
+		.mask_reset	= SWIN_SWOUT_ENABLED,
+	},
 };
 
 #define MAX_REGUL	ARRAY_SIZE(regulators_table)
@@ -581,17 +607,19 @@ int stpmic1_regulator_enable(const char *name)
 {
 	const struct regul_struct *regul = get_regulator_data(name);
 
-	return stpmic1_register_update(regul->control_reg, BIT(0), BIT(0));
+	return stpmic1_register_update(regul->control_reg, LDO_BUCK_ENABLE_MASK,
+				       LDO_BUCK_ENABLE_MASK);
 }
 
 int stpmic1_regulator_disable(const char *name)
 {
 	const struct regul_struct *regul = get_regulator_data(name);
 
-	return stpmic1_register_update(regul->control_reg, 0, BIT(0));
+	return stpmic1_register_update(regul->control_reg, 0,
+				       LDO_BUCK_ENABLE_MASK);
 }
 
-uint8_t stpmic1_is_regulator_enabled(const char *name)
+bool stpmic1_is_regulator_enabled(const char *name)
 {
 	uint8_t val;
 	const struct regul_struct *regul = get_regulator_data(name);
@@ -600,7 +628,7 @@ uint8_t stpmic1_is_regulator_enabled(const char *name)
 		panic();
 	}
 
-	return (val & 0x1U);
+	return (val & LDO_BUCK_ENABLE_MASK) == LDO_BUCK_ENABLE_MASK;
 }
 
 int stpmic1_regulator_voltage_set(const char *name, uint16_t millivolts)
@@ -648,10 +676,46 @@ int stpmic1_regulator_mask_reset_set(const char *name)
 				       regul->mask_reset);
 }
 
-int stpmic1_regulator_voltage_get(const char *name)
+/* Low-power functions */
+int stpmic1_lp_copy_reg(const char *name)
+{
+	uint8_t val;
+	int status;
+	const struct regul_struct *regul = get_regulator_data(name);
+
+	if (regul->low_power_reg == 0U) {
+		return 0;
+	}
+
+	status = stpmic1_register_read(regul->control_reg, &val);
+	if (status != 0) {
+		return status;
+	}
+
+	return stpmic1_register_write(regul->low_power_reg, val);
+}
+
+int stpmic1_lp_reg_on_off(const char *name, uint8_t enable)
 {
 	const struct regul_struct *regul = get_regulator_data(name);
-	uint8_t value;
+
+	return stpmic1_register_update(regul->low_power_reg, enable,
+				       LDO_BUCK_ENABLE_MASK);
+}
+
+int stpmic1_lp_set_mode(const char *name, uint8_t hplp)
+{
+	const struct regul_struct *regul = get_regulator_data(name);
+
+	return stpmic1_register_update(regul->low_power_reg,
+				       hplp << LDO_BUCK_HPLP_SHIFT,
+				       LDO_BUCK_HPLP_ENABLE_MASK);
+}
+
+int stpmic1_lp_set_voltage(const char *name, uint16_t millivolts)
+{
+	uint8_t voltage_index = voltage_to_index(name, millivolts);
+	const struct regul_struct *regul = get_regulator_data(name);
 	uint8_t mask;
 
 	/* Voltage can be set for buck<N> or ldo<N> (except ldo4) regulators */
@@ -664,13 +728,37 @@ int stpmic1_regulator_voltage_get(const char *name)
 		return 0;
 	}
 
-	if (stpmic1_register_read(regul->control_reg, &value))
-		return -1;
+	return stpmic1_register_update(regul->low_power_reg, voltage_index << 2,
+				       mask);
+}
+
+int stpmic1_regulator_voltage_get(const char *name)
+{
+	const struct regul_struct *regul = get_regulator_data(name);
+	uint8_t value;
+	uint8_t mask;
+	int status;
+
+	/* Voltage can be set for buck<N> or ldo<N> (except ldo4) regulators */
+	if (strncmp(name, "buck", 4) == 0) {
+		mask = BUCK_VOLTAGE_MASK;
+	} else if ((strncmp(name, "ldo", 3) == 0) &&
+		   (strncmp(name, "ldo4", 4) != 0)) {
+		mask = LDO_VOLTAGE_MASK;
+	} else {
+		return 0;
+	}
+
+	status = stpmic1_register_read(regul->control_reg, &value);
+	if (status < 0) {
+		return status;
+	}
 
 	value = (value & mask) >> LDO_BUCK_VOLTAGE_SHIFT;
 
-	if (value > regul->voltage_table_size)
-		return -1;
+	if (value > regul->voltage_table_size) {
+		return -ERANGE;
+	}
 
 	return (int)regul->voltage_table[value];
 }
@@ -706,7 +794,7 @@ int stpmic1_register_write(uint8_t register_id, uint8_t value)
 		}
 
 		if (readval != value) {
-			return -1;
+			return -EIO;
 		}
 	}
 #endif
@@ -751,12 +839,12 @@ void stpmic1_dump_regulators(void)
 
 int stpmic1_get_version(unsigned long *version)
 {
-	int rc;
 	uint8_t read_val;
+	int status;
 
-	rc = stpmic1_register_read(VERSION_STATUS_REG, &read_val);
-	if (rc) {
-		return -1;
+	status = stpmic1_register_read(VERSION_STATUS_REG, &read_val);
+	if (status < 0) {
+		return status;
 	}
 
 	*version = (unsigned long)read_val;

@@ -51,6 +51,7 @@
 #define MAX_IO_DEVICES			U(4)
 #define MAX_IO_HANDLES			U(4)
 #define MAX_IO_BLOCK_DEVICES		U(1)
+#define MAX_IO_MTD_DEVICES		U(1)
 
 /*******************************************************************************
  * BL2 specific defines.
@@ -82,6 +83,10 @@
  */
 #define PLAT_STM32MP_NS_IMAGE_OFFSET	BL33_BASE
 
+/* need by flash programmer */
+#define FLASHLAYOUT_BASE		STM32MP_DDR_BASE
+#define FLASHLAYOUT_LIMIT		STM32MP_BL33_BASE
+
 /*******************************************************************************
  * DTB specific defines.
  ******************************************************************************/
@@ -112,6 +117,8 @@
  */
 #define ARM_IRQ_SEC_PHY_TIMER		U(29)
 
+#define ARM_IRQ_NON_SEC_SGI_0		U(0)
+
 #define ARM_IRQ_SEC_SGI_0		U(8)
 #define ARM_IRQ_SEC_SGI_1		U(9)
 #define ARM_IRQ_SEC_SGI_2		U(10)
@@ -121,7 +128,15 @@
 #define ARM_IRQ_SEC_SGI_6		U(14)
 #define ARM_IRQ_SEC_SGI_7		U(15)
 
+/* Platform IRQ Priority */
+#define STM32MP1_IRQ_RCC_SEC_PRIO	U(0x6)
+#define STM32MP_IRQ_SEC_SPI_PRIO	U(0x10)
+
 #define STM32MP1_IRQ_TZC400		U(36)
+#define STM32MP1_IRQ_MCU_SEV		U(176)
+#define STM32MP1_IRQ_RCC_WAKEUP		U(177)
+#define STM32MP1_IRQ_IWDG1		U(182)
+#define STM32MP1_IRQ_IWDG2		U(183)
 #define STM32MP1_IRQ_TAMPSERRS		U(229)
 #define STM32MP1_IRQ_AXIERRIRQ		U(244)
 

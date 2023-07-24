@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019, STMicroelectronics - All Rights Reserved
+ * Copyright (c) 2014-2020, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -9,12 +9,16 @@
 
 #include <common/debug.h>
 #include <common/runtime_svc.h>
+#include <drivers/st/scmi-msg.h>
 #include <lib/psci/psci.h>
 #include <tools_share/uuid.h>
 
 #include <stm32mp1_smc.h>
 
 #include "bsec_svc.h"
+#include "low_power_svc.h"
+#include "pwr_svc.h"
+#include "rcc_svc.h"
 
 /* STM32 SiP Service UUID */
 DEFINE_SVC_UUID2(stm32_sip_svc_uid,
@@ -65,9 +69,39 @@ static uintptr_t stm32mp1_svc_smc_handler(uint32_t smc_fid, u_register_t x1,
 		ret2_enabled = true;
 		break;
 
+	case STM32_SMC_RCC:
+		ret1 = rcc_scv_handler(x1, x2, x3);
+		break;
+
+	case STM32_SMC_RCC_CAL:
+		ret1 = rcc_cal_scv_handler(x1);
+		break;
+
+	case STM32_SMC_RCC_OPP:
+		ret1 = rcc_opp_scv_handler(x1, x2, &ret2);
+		ret2_enabled = true;
+		break;
+
+	case STM32_SMC_PWR:
+		ret1 = pwr_scv_handler(x1, x2, x3);
+		break;
+
+	case STM32_SMC_PD_DOMAIN:
+		ret1 = pm_domain_scv_handler(x1, x2);
+		break;
+
+	case STM32_SMC_SCMI_MESSAGE_AGENT0:
+		scmi_smt_fastcall_smc_entry(0U);
+		ret1 = STM32_SMC_OK;
+		break;
+	case STM32_SMC_SCMI_MESSAGE_AGENT1:
+		scmi_smt_fastcall_smc_entry(1U);
+		ret1 = STM32_SMC_OK;
+		break;
+
 	default:
 		WARN("Unimplemented STM32MP1 Service Call: 0x%x\n", smc_fid);
-		ret1 = SMC_UNK;
+		ret1 = STM32_SMC_NOT_SUPPORTED;
 		break;
 	}
 

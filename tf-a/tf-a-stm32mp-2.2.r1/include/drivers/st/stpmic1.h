@@ -86,15 +86,15 @@
 #define ITSOURCE4_REG			0xB3U
 
 /* Registers masks */
-#define LDO_VOLTAGE_MASK		0x7CU
-#define BUCK_VOLTAGE_MASK		0xFCU
+#define LDO_VOLTAGE_MASK		GENMASK(6, 2)
+#define BUCK_VOLTAGE_MASK		GENMASK(7, 2)
 #define LDO_BUCK_VOLTAGE_SHIFT		2
-#define LDO_BUCK_ENABLE_MASK		0x01U
-#define LDO_BUCK_HPLP_ENABLE_MASK	0x02U
+#define LDO_BUCK_ENABLE_MASK		BIT(0)
+#define LDO_BUCK_HPLP_ENABLE_MASK	BIT(1)
 #define LDO_BUCK_HPLP_SHIFT		1
-#define LDO_BUCK_RANK_MASK		0x01U
-#define LDO_BUCK_RESET_MASK		0x01U
-#define LDO_BUCK_PULL_DOWN_MASK		0x03U
+#define LDO_BUCK_RANK_MASK		BIT(0)
+#define LDO_BUCK_RESET_MASK		BIT(0)
+#define LDO_BUCK_PULL_DOWN_MASK		GENMASK(1, 0)
 
 /* Pull down register */
 #define BUCK1_PULL_DOWN_SHIFT		0
@@ -135,12 +135,12 @@
 /* Main PMIC VINLOW Control Register (VIN_CONTROL_REGC DMSC) */
 #define SWIN_DETECTOR_ENABLED		BIT(7)
 #define SWOUT_DETECTOR_ENABLED          BIT(6)
-#define VINLOW_HYST_MASK		0x3
+#define VINLOW_HYST_MASK		GENMASK(1, 0)
 #define VINLOW_HYST_SHIFT		4
-#define VINLOW_THRESHOLD_MASK		0x7
+#define VINLOW_THRESHOLD_MASK		GENMASK(2, 0)
 #define VINLOW_THRESHOLD_SHIFT		1
-#define VINLOW_ENABLED			0x01
-#define VINLOW_CTRL_REG_MASK		0xFF
+#define VINLOW_ENABLED			BIT(0)
+#define VINLOW_CTRL_REG_MASK		GENMASK(7, 0)
 
 /* USB Control Register */
 #define BOOST_OVP_DISABLED		BIT(7)
@@ -148,6 +148,7 @@
 #define OCP_LIMIT_HIGH			BIT(3)
 #define SWIN_SWOUT_ENABLED		BIT(2)
 #define USBSW_OTG_SWITCH_ENABLED	BIT(1)
+#define BOOST_ENABLED			BIT(0)
 
 int stpmic1_powerctrl_on(void);
 int stpmic1_switch_off(void);
@@ -156,11 +157,15 @@ int stpmic1_register_write(uint8_t register_id, uint8_t value);
 int stpmic1_register_update(uint8_t register_id, uint8_t value, uint8_t mask);
 int stpmic1_regulator_enable(const char *name);
 int stpmic1_regulator_disable(const char *name);
-uint8_t stpmic1_is_regulator_enabled(const char *name);
+bool stpmic1_is_regulator_enabled(const char *name);
 int stpmic1_regulator_voltage_set(const char *name, uint16_t millivolts);
 int stpmic1_regulator_voltage_get(const char *name);
 int stpmic1_regulator_pull_down_set(const char *name);
 int stpmic1_regulator_mask_reset_set(const char *name);
+int stpmic1_lp_copy_reg(const char *name);
+int stpmic1_lp_reg_on_off(const char *name, uint8_t enable);
+int stpmic1_lp_set_mode(const char *name, uint8_t hplp);
+int stpmic1_lp_set_voltage(const char *name, uint16_t millivolts);
 void stpmic1_bind_i2c(struct i2c_handle_s *i2c_handle, uint16_t i2c_addr);
 
 int stpmic1_get_version(unsigned long *version);

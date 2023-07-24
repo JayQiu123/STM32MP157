@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2019, STMicroelectronics - All Rights Reserved
+ * Copyright (C) 2018-2020, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause
  */
@@ -46,6 +46,26 @@ int stm32mp1_ddr_clk_enable(struct ddr_info *priv, uint32_t mem_speed)
 		      mem_speed, ddrphy_clk / 1000U);
 		return -1;
 	}
+	return 0;
+}
+
+/*******************************************************************************
+ * This function tests a simple read/write access to the DDR.
+ * Note that the previous content is restored after test.
+ * Returns 0 if success, and address value else.
+ ******************************************************************************/
+static uint32_t ddr_test_rw_access(void)
+{
+	uint32_t saved_value = mmio_read_32(STM32MP_DDR_BASE);
+
+	mmio_write_32(STM32MP_DDR_BASE, DDR_PATTERN);
+
+	if (mmio_read_32(STM32MP_DDR_BASE) != DDR_PATTERN) {
+		return (uint32_t)STM32MP_DDR_BASE;
+	}
+
+	mmio_write_32(STM32MP_DDR_BASE, saved_value);
+
 	return 0;
 }
 
@@ -168,23 +188,30 @@ static int stm32mp1_ddr_setup(void)
 	int ret;
 	struct stm32mp1_ddr_config config;
 	int node, len;
-	uint32_t uret, idx;
+	uint32_t magic, uret, idx;
 	void *fdt;
+	uint32_t bkpr_core1_addr =
+		tamp_bkpr(BOOT_API_CORE1_BRANCH_ADDRESS_TAMP_BCK_REG_IDX);
+	uint32_t bkpr_core1_magic =
+		tamp_bkpr(BOOT_API_CORE1_MAGIC_NUMBER_TAMP_BCK_REG_IDX);
 
-#define PARAM(x, y)							\
+#define PARAM(x, y, z)							\
 	{								\
 		.name = x,						\
 		.offset = offsetof(struct stm32mp1_ddr_config, y),	\
-		.size = sizeof(config.y) / sizeof(uint32_t)		\
+		.size = sizeof(config.y) / sizeof(uint32_t),		\
+		.present = z						\
 	}
 
-#define CTL_PARAM(x) PARAM("st,ctl-"#x, c_##x)
-#define PHY_PARAM(x) PARAM("st,phy-"#x, p_##x)
+#define CTL_PARAM(x) PARAM("st,ctl-"#x, c_##x, NULL)
+#define PHY_PARAM(x) PARAM("st,phy-"#x, p_##x, NULL)
+#define PHY_PARAM_OPT(x) PARAM("st,phy-"#x, p_##x, &config.p_##x##_present)
 
 	const struct {
 		const char *name; /* Name in DT */
 		const uint32_t offset; /* Offset in config struct */
 		const uint32_t size;   /* Size of parameters */
+		bool * const present;  /* presence indication for opt */
 	} param[] = {
 		CTL_PARAM(reg),
 		CTL_PARAM(timing),
@@ -192,16 +219,15 @@ static int stm32mp1_ddr_setup(void)
 		CTL_PARAM(perf),
 		PHY_PARAM(reg),
 		PHY_PARAM(timing),
-		PHY_PARAM(cal)
+		PHY_PARAM_OPT(cal)
 	};
 
 	if (fdt_get_address(&fdt) == 0) {
 		return -ENOENT;
 	}
 
-	node = fdt_node_offset_by_compatible(fdt, -1, DT_DDR_COMPAT);
+	node = dt_get_node_by_compatible(DT_DDR_COMPAT);
 	if (node < 0) {
-		ERROR("%s: Cannot read DDR node in DT\n", __func__);
 		return -EINVAL;
 	}
 
@@ -230,12 +256,33 @@ static int stm32mp1_ddr_setup(void)
 
 		VERBOSE("%s: %s[0x%x] = %d\n", __func__,
 			param[idx].name, param[idx].size, ret);
-		if (ret != 0) {
-			ERROR("%s: Cannot read %s\n",
-			      __func__, param[idx].name);
+		if ((ret != 0) &&
+		    ((ret != -FDT_ERR_NOTFOUND) ||
+		     (param[idx].present == NULL))) {
+			ERROR("%s: Cannot read %s, error=%d\n",
+			      __func__, param[idx].name, ret);
 			return -EINVAL;
 		}
+		if (param[idx].present != NULL) {
+			/* save presence of optional parameters */
+			*(param[idx].present) = true;
+			if (ret == -FDT_ERR_NOTFOUND) {
+				*(param[idx].present) = false;
+			}
+		}
 	}
+
+	config.self_refresh = false;
+
+	stm32mp_clk_enable(RTCAPB);
+
+	magic =	mmio_read_32(bkpr_core1_magic);
+	if (magic == BOOT_API_A7_CORE0_MAGIC_NUMBER) {
+		config.self_refresh = true;
+		config.zdata = stm32_get_zdata_from_context();
+	}
+
+	stm32mp_clk_disable(RTCAPB);
 
 	/* Disable axidcg clock gating during init */
 	mmio_clrbits_32(priv->rcc + RCC_DDRITFCR, RCC_DDRITFCR_AXIDCGEN);
@@ -245,36 +292,58 @@ static int stm32mp1_ddr_setup(void)
 	/* Enable axidcg clock gating */
 	mmio_setbits_32(priv->rcc + RCC_DDRITFCR, RCC_DDRITFCR_AXIDCGEN);
 
+	/* check if DDR content is lost (self-refresh aborted) */
+	if ((magic == BOOT_API_A7_CORE0_MAGIC_NUMBER) && !config.self_refresh) {
+		/* clear Backup register */
+		mmio_write_32(bkpr_core1_addr, 0);
+		/* clear magic number */
+		mmio_write_32(bkpr_core1_magic, 0);
+	}
+
 	priv->info.size = config.info.size;
 
 	VERBOSE("%s : ram size(%x, %x)\n", __func__,
 		(uint32_t)priv->info.base, (uint32_t)priv->info.size);
 
-	write_sctlr(read_sctlr() & ~SCTLR_C_BIT);
-	dcsw_op_all(DC_OP_CISW);
+	if (config.self_refresh) {
+		uret = ddr_test_rw_access();
+		if (uret != 0U) {
+			ERROR("DDR rw test: Can't access memory @ 0x%x\n",
+			      uret);
+			panic();
+		}
 
-	uret = ddr_test_data_bus();
-	if (uret != 0U) {
-		ERROR("DDR data bus test: can't access memory @ 0x%x\n",
-		      uret);
-		panic();
+		/* Restore area overwritten by training */
+		stm32_restore_ddr_training_area();
+	} else {
+		uret = ddr_test_data_bus();
+		if (uret != 0U) {
+			ERROR("DDR data bus test: can't access memory @ 0x%x\n",
+			      uret);
+			panic();
+		}
+
+		uret = ddr_test_addr_bus();
+		if (uret != 0U) {
+			ERROR("DDR addr bus test: can't access memory @ 0x%x\n",
+			      uret);
+			panic();
+		}
+
+		uret = ddr_check_size();
+		if (uret < config.info.size) {
+			ERROR("DDR size: 0x%x does not match DT config: 0x%x\n",
+			      uret, config.info.size);
+			panic();
+		}
 	}
 
-	uret = ddr_test_addr_bus();
-	if (uret != 0U) {
-		ERROR("DDR addr bus test: can't access memory @ 0x%x\n",
-		      uret);
-		panic();
-	}
-
-	uret = ddr_check_size();
-	if (uret < config.info.size) {
-		ERROR("DDR size: 0x%x does not match DT config: 0x%x\n",
-		      uret, config.info.size);
-		panic();
-	}
-
-	write_sctlr(read_sctlr() | SCTLR_C_BIT);
+	/*
+	 * Initialization sequence has configured DDR registers with settings.
+	 * The Self Refresh (SR) mode corresponding to these settings has now
+	 * to be set.
+	 */
+	ddr_set_sr_mode(ddr_read_sr_mode());
 
 	return 0;
 }

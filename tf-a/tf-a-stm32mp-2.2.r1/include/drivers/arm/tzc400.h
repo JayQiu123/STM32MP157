@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -33,6 +33,7 @@
 #define BUILD_CONFIG_NR_SHIFT			0
 #define BUILD_CONFIG_NR_MASK			U(0x1f)
 
+#define FILTER_OFFSET				0x10
 /*
  * Number of gate keepers is implementation defined. But we know the max for
  * this device is 4. Get implementation details from BUILD_CONFIG.
@@ -103,46 +104,46 @@
  ******************************************************************************/
 void tzc400_init(uintptr_t base);
 void tzc400_configure_region0(unsigned int sec_attr,
-			   unsigned int ns_device_access);
+			      unsigned int ns_device_access);
 void tzc400_configure_region(unsigned int filters,
-			  unsigned int region,
-			  unsigned long long region_base,
-			  unsigned long long region_top,
-			  unsigned int sec_attr,
-			  unsigned int nsaid_permissions);
+			     unsigned int region,
+			     unsigned long long region_base,
+			     unsigned long long region_top,
+			     unsigned int sec_attr,
+			     unsigned int nsaid_permissions);
 void tzc400_set_action(unsigned int action);
 void tzc400_enable_filters(void);
 void tzc400_disable_filters(void);
+void tzc400_clear_all_interrupts(void);
+int tzc400_is_pending_interrupt(void);
+void tzc400_it_handler(void);
 
 static inline void tzc_init(uintptr_t base)
 {
 	tzc400_init(base);
 }
 
-static inline void tzc_configure_region0(
-			unsigned int sec_attr,
-			unsigned int ns_device_access)
+static inline void tzc_configure_region0(unsigned int sec_attr,
+					 unsigned int ns_device_access)
 {
 	tzc400_configure_region0(sec_attr, ns_device_access);
 }
 
-static inline void tzc_configure_region(
-			  unsigned int filters,
-			  unsigned int region,
-			  unsigned long long region_base,
-			  unsigned long long region_top,
-			  unsigned int sec_attr,
-			  unsigned int ns_device_access)
+static inline void tzc_configure_region(unsigned int filters,
+					unsigned int region,
+					unsigned long long region_base,
+					unsigned long long region_top,
+					unsigned int sec_attr,
+					unsigned int ns_device_access)
 {
 	tzc400_configure_region(filters, region, region_base,
-			region_top, sec_attr, ns_device_access);
+				region_top, sec_attr, ns_device_access);
 }
 
 static inline void tzc_set_action(unsigned int action)
 {
 	tzc400_set_action(action);
 }
-
 
 static inline void tzc_enable_filters(void)
 {

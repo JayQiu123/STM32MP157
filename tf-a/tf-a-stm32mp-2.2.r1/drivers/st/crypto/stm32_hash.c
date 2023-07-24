@@ -21,6 +21,8 @@
 #include <lib/utils.h>
 #include <plat/common/platform.h>
 
+#define TIMEOUT_US_1MS			U(1000)
+
 #define DT_HASH_COMPAT			"st,stm32f756-hash"
 
 #define HASH_CR				0x00U
@@ -251,6 +253,8 @@ int stm32_hash_final(uint8_t *digest)
 		mmio_clrsetbits_32(hash_base() + HASH_STR, HASH_STR_NBLW_MASK,
 				   8U * stm32_remain.length);
 		zeromem(&stm32_remain, sizeof(stm32_remain));
+	} else {
+		mmio_clrbits_32(hash_base() + HASH_STR, HASH_STR_NBLW_MASK);
 	}
 
 	mmio_setbits_32(hash_base() + HASH_STR, HASH_STR_DCAL);
@@ -319,9 +323,16 @@ int stm32_hash_register(void)
 	stm32mp_clk_enable(stm32_hash.clock);
 
 	if (hash_info.reset >= 0) {
-		stm32mp_reset_assert((unsigned long)hash_info.reset);
+		uint32_t reset = hash_info.reset;
+
+		if (stm32mp_reset_assert_to(reset, TIMEOUT_US_1MS)) {
+			panic();
+		}
+
 		udelay(20);
-		stm32mp_reset_deassert((unsigned long)hash_info.reset);
+		if (stm32mp_reset_deassert_to(reset, TIMEOUT_US_1MS)) {
+			panic();
+		}
 	}
 
 	stm32mp_clk_disable(stm32_hash.clock);

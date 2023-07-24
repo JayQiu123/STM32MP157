@@ -63,6 +63,16 @@
 	((val) + _div - (__typeof__(div)) 1) / _div;		\
 })
 
+/*
+ * Macro for unsigned integer division with nearest rounding variant.
+ * Default integer division rounds down.
+ */
+#define udiv_round_nearest(x, y) __extension__ ({	\
+	__typeof__(x) _x = (x);				\
+	__typeof__(y) _y = (y);				\
+	(_x + (_y / 2)) / _y;				\
+})
+
 #define MIN(x, y) __extension__ ({	\
 	__typeof__(x) _x = (x);		\
 	__typeof__(y) _y = (y);		\
@@ -75,6 +85,15 @@
 	__typeof__(y) _y = (y);		\
 	(void)(&_x == &_y);		\
 	_x > _y ? _x : _y;		\
+})
+
+#define CLAMP(x, min, max) __extension__ ({ \
+	__typeof__(x) _x = (x); \
+	__typeof__(min) _min = (min); \
+	__typeof__(max) _max = (max); \
+	(void)(&_x == &_min); \
+	(void)(&_x == &_max); \
+	(_x > _max ? _max : (_x < _min ? _min : _x)); \
 })
 
 /*

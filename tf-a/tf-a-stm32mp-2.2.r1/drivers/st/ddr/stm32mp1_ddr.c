@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018-2019, STMicroelectronics - All Rights Reserved
+ * Copyright (C) 2018-2020, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause
  */
@@ -29,6 +29,7 @@ struct reg_desc {
 
 #define INVALID_OFFSET	0xFFU
 
+#define TIMESLOT_US_1US	1U
 #define TIMEOUT_US_1S	1000000U
 
 #define DDRCTL_REG(x, y)					\
@@ -45,8 +46,22 @@ struct reg_desc {
 		.par_offset = offsetof(struct y, x)		\
 	}
 
+/*
+ * PARAMETERS: value get from device tree :
+ *             size / order need to be aligned with binding
+ *             modification NOT ALLOWED !!!
+ */
+#define DDRCTL_REG_REG_SIZE	25	/* st,ctl-reg */
+#define DDRCTL_REG_TIMING_SIZE	12	/* st,ctl-timing */
+#define DDRCTL_REG_MAP_SIZE	9	/* st,ctl-map */
+#define DDRCTL_REG_PERF_SIZE	17	/* st,ctl-perf */
+
+#define DDRPHY_REG_REG_SIZE	11	/* st,phy-reg */
+#define	DDRPHY_REG_TIMING_SIZE	10	/* st,phy-timing */
+#define	DDRPHY_REG_CAL_SIZE	12	/* st,phy-cal */
+
 #define DDRCTL_REG_REG(x)	DDRCTL_REG(x, stm32mp1_ddrctrl_reg)
-static const struct reg_desc ddr_reg[] = {
+static const struct reg_desc ddr_reg[DDRCTL_REG_REG_SIZE] = {
 	DDRCTL_REG_REG(mstr),
 	DDRCTL_REG_REG(mrctrl0),
 	DDRCTL_REG_REG(mrctrl1),
@@ -75,7 +90,7 @@ static const struct reg_desc ddr_reg[] = {
 };
 
 #define DDRCTL_REG_TIMING(x)	DDRCTL_REG(x, stm32mp1_ddrctrl_timing)
-static const struct reg_desc ddr_timing[] = {
+static const struct reg_desc ddr_timing[DDRCTL_REG_TIMING_SIZE] = {
 	DDRCTL_REG_TIMING(rfshtmg),
 	DDRCTL_REG_TIMING(dramtmg0),
 	DDRCTL_REG_TIMING(dramtmg1),
@@ -91,7 +106,7 @@ static const struct reg_desc ddr_timing[] = {
 };
 
 #define DDRCTL_REG_MAP(x)	DDRCTL_REG(x, stm32mp1_ddrctrl_map)
-static const struct reg_desc ddr_map[] = {
+static const struct reg_desc ddr_map[DDRCTL_REG_MAP_SIZE] = {
 	DDRCTL_REG_MAP(addrmap1),
 	DDRCTL_REG_MAP(addrmap2),
 	DDRCTL_REG_MAP(addrmap3),
@@ -104,7 +119,7 @@ static const struct reg_desc ddr_map[] = {
 };
 
 #define DDRCTL_REG_PERF(x)	DDRCTL_REG(x, stm32mp1_ddrctrl_perf)
-static const struct reg_desc ddr_perf[] = {
+static const struct reg_desc ddr_perf[DDRCTL_REG_PERF_SIZE] = {
 	DDRCTL_REG_PERF(sched),
 	DDRCTL_REG_PERF(sched1),
 	DDRCTL_REG_PERF(perfhpr1),
@@ -125,7 +140,7 @@ static const struct reg_desc ddr_perf[] = {
 };
 
 #define DDRPHY_REG_REG(x)	DDRPHY_REG(x, stm32mp1_ddrphy_reg)
-static const struct reg_desc ddrphy_reg[] = {
+static const struct reg_desc ddrphy_reg[DDRPHY_REG_REG_SIZE] = {
 	DDRPHY_REG_REG(pgcr),
 	DDRPHY_REG_REG(aciocr),
 	DDRPHY_REG_REG(dxccr),
@@ -140,7 +155,7 @@ static const struct reg_desc ddrphy_reg[] = {
 };
 
 #define DDRPHY_REG_TIMING(x)	DDRPHY_REG(x, stm32mp1_ddrphy_timing)
-static const struct reg_desc ddrphy_timing[] = {
+static const struct reg_desc ddrphy_timing[DDRPHY_REG_TIMING_SIZE] = {
 	DDRPHY_REG_TIMING(ptr0),
 	DDRPHY_REG_TIMING(ptr1),
 	DDRPHY_REG_TIMING(ptr2),
@@ -154,7 +169,7 @@ static const struct reg_desc ddrphy_timing[] = {
 };
 
 #define DDRPHY_REG_CAL(x)	DDRPHY_REG(x, stm32mp1_ddrphy_cal)
-static const struct reg_desc ddrphy_cal[] = {
+static const struct reg_desc ddrphy_cal[DDRPHY_REG_CAL_SIZE] = {
 	DDRPHY_REG_CAL(dx0dllcr),
 	DDRPHY_REG_CAL(dx0dqtr),
 	DDRPHY_REG_CAL(dx0dqstr),
@@ -169,36 +184,9 @@ static const struct reg_desc ddrphy_cal[] = {
 	DDRPHY_REG_CAL(dx3dqstr),
 };
 
-#define DDR_REG_DYN(x)						\
-	{							\
-		.name = #x,					\
-		.offset = offsetof(struct stm32mp1_ddrctl, x),	\
-		.par_offset = INVALID_OFFSET \
-	}
-
-static const struct reg_desc ddr_dyn[] = {
-	DDR_REG_DYN(stat),
-	DDR_REG_DYN(init0),
-	DDR_REG_DYN(dfimisc),
-	DDR_REG_DYN(dfistat),
-	DDR_REG_DYN(swctl),
-	DDR_REG_DYN(swstat),
-	DDR_REG_DYN(pctrl_0),
-	DDR_REG_DYN(pctrl_1),
-};
-
-#define DDRPHY_REG_DYN(x)					\
-	{							\
-		.name = #x,					\
-		.offset = offsetof(struct stm32mp1_ddrphy, x),	\
-		.par_offset = INVALID_OFFSET			\
-	}
-
-static const struct reg_desc ddrphy_dyn[] = {
-	DDRPHY_REG_DYN(pir),
-	DDRPHY_REG_DYN(pgsr),
-};
-
+/*
+ * REGISTERS ARRAY: used to parse device tree and interactive mode
+ */
 enum reg_type {
 	REG_REG,
 	REG_TIMING,
@@ -207,12 +195,6 @@ enum reg_type {
 	REGPHY_REG,
 	REGPHY_TIMING,
 	REGPHY_CAL,
-/*
- * Dynamic registers => managed in driver or not changed,
- * can be dumped in interactive mode.
- */
-	REG_DYN,
-	REGPHY_DYN,
 	REG_TYPE_NB
 };
 
@@ -233,55 +215,43 @@ static const struct ddr_reg_info ddr_registers[REG_TYPE_NB] = {
 	[REG_REG] = {
 		.name = "static",
 		.desc = ddr_reg,
-		.size = ARRAY_SIZE(ddr_reg),
+		.size = DDRCTL_REG_REG_SIZE,
 		.base = DDR_BASE
 	},
 	[REG_TIMING] = {
 		.name = "timing",
 		.desc = ddr_timing,
-		.size = ARRAY_SIZE(ddr_timing),
+		.size = DDRCTL_REG_TIMING_SIZE,
 		.base = DDR_BASE
 	},
 	[REG_PERF] = {
 		.name = "perf",
 		.desc = ddr_perf,
-		.size = ARRAY_SIZE(ddr_perf),
+		.size = DDRCTL_REG_PERF_SIZE,
 		.base = DDR_BASE
 	},
 	[REG_MAP] = {
 		.name = "map",
 		.desc = ddr_map,
-		.size = ARRAY_SIZE(ddr_map),
+		.size = DDRCTL_REG_MAP_SIZE,
 		.base = DDR_BASE
 	},
 	[REGPHY_REG] = {
 		.name = "static",
 		.desc = ddrphy_reg,
-		.size = ARRAY_SIZE(ddrphy_reg),
+		.size = DDRPHY_REG_REG_SIZE,
 		.base = DDRPHY_BASE
 	},
 	[REGPHY_TIMING] = {
 		.name = "timing",
 		.desc = ddrphy_timing,
-		.size = ARRAY_SIZE(ddrphy_timing),
+		.size = DDRPHY_REG_TIMING_SIZE,
 		.base = DDRPHY_BASE
 	},
 	[REGPHY_CAL] = {
 		.name = "cal",
 		.desc = ddrphy_cal,
-		.size = ARRAY_SIZE(ddrphy_cal),
-		.base = DDRPHY_BASE
-	},
-	[REG_DYN] = {
-		.name = "dyn",
-		.desc = ddr_dyn,
-		.size = ARRAY_SIZE(ddr_dyn),
-		.base = DDR_BASE
-	},
-	[REGPHY_DYN] = {
-		.name = "dyn",
-		.desc = ddrphy_dyn,
-		.size = ARRAY_SIZE(ddrphy_dyn),
+		.size = DDRPHY_REG_CAL_SIZE,
 		.base = DDRPHY_BASE
 	},
 };
@@ -675,7 +645,8 @@ static void stm32mp1_refresh_disable(struct stm32mp1_ddrctl *ctl)
 	/* Quasi-dynamic register update*/
 	mmio_setbits_32((uintptr_t)&ctl->rfshctl3,
 			DDRCTRL_RFSHCTL3_DIS_AUTO_REFRESH);
-	mmio_clrbits_32((uintptr_t)&ctl->pwrctl, DDRCTRL_PWRCTL_POWERDOWN_EN);
+	mmio_clrbits_32((uintptr_t)&ctl->pwrctl, DDRCTRL_PWRCTL_POWERDOWN_EN |
+						 DDRCTRL_PWRCTL_SELFREF_EN);
 	mmio_clrbits_32((uintptr_t)&ctl->dfimisc,
 			DDRCTRL_DFIMISC_DFI_INIT_COMPLETE_EN);
 	stm32mp1_wait_sw_done_ack(ctl);
@@ -693,9 +664,90 @@ static void stm32mp1_refresh_restore(struct stm32mp1_ddrctl *ctl,
 		mmio_setbits_32((uintptr_t)&ctl->pwrctl,
 				DDRCTRL_PWRCTL_POWERDOWN_EN);
 	}
+	if ((pwrctl & DDRCTRL_PWRCTL_SELFREF_EN) != 0U) {
+		mmio_setbits_32((uintptr_t)&ctl->pwrctl,
+				DDRCTRL_PWRCTL_SELFREF_EN);
+	}
 	mmio_setbits_32((uintptr_t)&ctl->dfimisc,
 			DDRCTRL_DFIMISC_DFI_INIT_COMPLETE_EN);
 	stm32mp1_wait_sw_done_ack(ctl);
+}
+
+static void stm32mp1_refresh_cmd(struct stm32mp1_ddrctl *ctl)
+{
+	uint32_t dbgstat;
+
+	do {
+		dbgstat = mmio_read_32((uintptr_t)&ctl->dbgstat);
+	} while ((dbgstat & DDRCTRL_DBGSTAT_RANK0_REFRESH_BUSY) != 0U);
+
+	mmio_setbits_32((uintptr_t)&ctl->dbgcmd, DDRCTRL_DBGCMD_RANK0_REFRESH);
+}
+
+/* Refresh compensation by forcing refresh command
+ * Rule1: Tref should be always < tREFW ? R x tREBW/8
+ * Rule2: refcomp = RU(Tref/tREFI)  = RU(RxTref/tREFW)
+ */
+static
+void stm32mp1_refresh_compensation(const struct stm32mp1_ddr_config *config,
+				   struct stm32mp1_ddrctl *ctl,
+				   uint64_t start)
+{
+	uint32_t tck_ps;
+	uint64_t time_us, tref, trefi, refcomp, i;
+
+	time_us = timeout_init_us(0) - start;
+	tck_ps = 1000000000U / config->info.speed;
+	if (tck_ps == 0U) {
+		return;
+	}
+	/* ref = refresh time in tck */
+	tref = time_us * 1000000U / tck_ps;
+	trefi = ((mmio_read_32((uintptr_t)&ctl->rfshtmg) &
+		  DDRCTRL_RFSHTMG_T_RFC_NOM_X1_X32_MASK)
+		 >> DDRCTRL_RFSHTMG_T_RFC_NOM_X1_X32_SHIFT) * 32U;
+	if (trefi == 0U) {
+		return;
+	}
+
+	/* div round up : number of refresh to compensate */
+	refcomp = (tref + trefi - 1U) / trefi;
+
+	for (i = 0; i < refcomp; i++) {
+		stm32mp1_refresh_cmd(ctl);
+	}
+}
+
+static void stm32mp1_self_refresh_zcal(struct ddr_info *priv, uint32_t zdata)
+{
+	/* sequence for PUBL I/O Data Retention during Power-Down */
+
+	/* 10. Override ZQ calibration with previously (pre-retention)
+	 *     calibrated values. This is done by writing 1 to ZQ0CRN.ZDEN
+	 *     and the override data to ZQ0CRN.ZDATA.
+	 */
+	mmio_setbits_32((uintptr_t)&priv->phy->zq0cr0, DDRPHYC_ZQ0CRN_ZDEN);
+
+	mmio_clrsetbits_32((uintptr_t)&priv->phy->zq0cr0,
+			   DDRPHYC_ZQ0CRN_ZDATA_MASK,
+			   zdata << DDRPHYC_ZQ0CRN_ZDATA_SHIFT);
+
+	/* 11. De-assert the PHY_top data retention enable signals
+	 *     (ret_en or ret_en_i/ret_en_n_i).
+	 */
+	mmio_setbits_32((uintptr_t)(priv->pwr) + PWR_CR3, PWR_CR3_DDRSRDIS);
+	mmio_clrbits_32((uintptr_t)(priv->pwr) + PWR_CR3, PWR_CR3_DDRRETEN);
+
+	/* 12. Remove ZQ calibration override by writing 0 to ZQ0CRN.ZDEN. */
+	mmio_clrbits_32((uintptr_t)&priv->phy->zq0cr0, DDRPHYC_ZQ0CRN_ZDEN);
+
+	/* 13. Trigger ZQ calibration by writing 1 to PIR.INIT
+	 *     and '1' to PIR.ZCAL
+	 */
+	/* 14. Wait for ZQ calibration to finish by polling a 1 status
+	 * on PGSR.IDONE.
+	 */
+	stm32mp1_ddrphy_init(priv->phy, DDRPHYC_PIR_ZCAL);
 }
 
 static int board_ddr_power_init(enum ddr_type ddr_type)
@@ -710,7 +762,7 @@ static int board_ddr_power_init(enum ddr_type ddr_type)
 void stm32mp1_ddr_init(struct ddr_info *priv,
 		       struct stm32mp1_ddr_config *config)
 {
-	uint32_t pir;
+	uint32_t pir, ddr_reten;
 	int ret = -EINVAL;
 
 	if ((config->c_reg.mstr & DDRCTRL_MSTR_DDR3) != 0U) {
@@ -730,6 +782,27 @@ void stm32mp1_ddr_init(struct ddr_info *priv,
 	VERBOSE("name = %s\n", config->info.name);
 	VERBOSE("speed = %d kHz\n", config->info.speed);
 	VERBOSE("size  = 0x%x\n", config->info.size);
+	if (config->self_refresh) {
+		VERBOSE("sel-refresh exit (zdata = 0x%x)\n", config->zdata);
+	}
+
+	/* Check DDR PHY pads retention */
+	ddr_reten = mmio_read_32((uint32_t)(priv->pwr) + PWR_CR3) &
+		    PWR_CR3_DDRRETEN;
+	if (config->self_refresh) {
+		if (ddr_reten == 0U) {
+			VERBOSE("self-refresh aborted: no retention\n");
+			config->self_refresh = false;
+		}
+	} else {
+		if (ddr_reten != 0U) {
+			VERBOSE("disable DDR PHY retention\n");
+			mmio_setbits_32((uint32_t)(priv->pwr) + PWR_CR3,
+					PWR_CR3_DDRSRDIS);
+			mmio_clrbits_32((uint32_t)(priv->pwr) + PWR_CR3,
+					PWR_CR3_DDRRETEN);
+		}
+	}
 
 	/* DDR INIT SEQUENCE */
 
@@ -790,6 +863,12 @@ void stm32mp1_ddr_init(struct ddr_info *priv,
 	set_reg(priv, REG_TIMING, &config->c_timing);
 	set_reg(priv, REG_MAP, &config->c_map);
 
+	/* Keep the controller in self-refresh mode */
+	if (config->self_refresh) {
+		mmio_setbits_32((uintptr_t)&priv->ctl->pwrctl,
+				DDRCTRL_PWRCTL_SELFREF_SW);
+	}
+
 	/* Skip CTRL init, SDRAM init is done by PHY PUBL */
 	mmio_clrsetbits_32((uintptr_t)&priv->ctl->init0,
 			   DDRCTRL_INIT0_SKIP_DRAM_INIT_MASK,
@@ -811,7 +890,9 @@ void stm32mp1_ddr_init(struct ddr_info *priv,
 	 */
 	set_reg(priv, REGPHY_REG, &config->p_reg);
 	set_reg(priv, REGPHY_TIMING, &config->p_timing);
-	set_reg(priv, REGPHY_CAL, &config->p_cal);
+	if (config->p_cal_present) {
+		set_reg(priv, REGPHY_CAL, &config->p_cal);
+	}
 
 	/* DDR3 = don't set DLLOFF for init mode */
 	if ((config->c_reg.mstr &
@@ -843,7 +924,19 @@ void stm32mp1_ddr_init(struct ddr_info *priv,
 		pir |= DDRPHYC_PIR_DRAMRST; /* Only for DDR3 */
 	}
 
+	/* Treat self-refresh exit : hot boot */
+	if (config->self_refresh) {
+		/* DDR in self refresh mode, remove zcal & reset & init */
+		pir &= ~(DDRPHYC_PIR_ZCAL & DDRPHYC_PIR_DRAMRST
+			 & DDRPHYC_PIR_DRAMINIT);
+		pir |= DDRPHYC_PIR_ZCALBYP;
+	}
+
 	stm32mp1_ddrphy_init(priv->phy, pir);
+
+	if (config->self_refresh) {
+		stm32mp1_self_refresh_zcal(priv, config->zdata);
+	}
 
 	/*
 	 *  6. SET DFIMISC.dfi_init_complete_en to 1
@@ -865,6 +958,13 @@ void stm32mp1_ddr_init(struct ddr_info *priv,
 	 */
 
 	/* Wait uMCTL2 ready */
+
+	/* Trigger self-refresh exit */
+	if (config->self_refresh) {
+		mmio_clrbits_32((uintptr_t)&priv->ctl->pwrctl,
+				DDRCTRL_PWRCTL_SELFREF_SW);
+	}
+
 	stm32mp1_wait_operating_mode(priv, DDRCTRL_STAT_OPERATING_MODE_NORMAL);
 
 	/* Switch to DLL OFF mode */
@@ -872,37 +972,53 @@ void stm32mp1_ddr_init(struct ddr_info *priv,
 		stm32mp1_ddr3_dll_off(priv);
 	}
 
-	VERBOSE("DDR DQS training : ");
+	if (config->p_cal_present) {
+		VERBOSE("DDR DQS training skipped.\n");
+	} else {
+		uint64_t time;
 
-	/*
-	 *  8. Disable Auto refresh and power down by setting
-	 *    - RFSHCTL3.dis_au_refresh = 1
-	 *    - PWRCTL.powerdown_en = 0
-	 *    - DFIMISC.dfiinit_complete_en = 0
-	 */
-	stm32mp1_refresh_disable(priv->ctl);
+		VERBOSE("DDR DQS training.\n");
 
-	/*
-	 *  9. Program PUBL PGCR to enable refresh during training
-	 *     and rank to train
-	 *     not done => keep the programed value in PGCR
-	 */
+		time = timeout_init_us(0);
 
-	/*
-	 * 10. configure PUBL PIR register to specify which training step
-	 * to run
-	 * Warning : RVTRN  is not supported by this PUBL
-	 */
-	stm32mp1_ddrphy_init(priv->phy, DDRPHYC_PIR_QSTRN);
+		/*
+		 *  8. Disable Auto refresh and power down by setting
+		 *    - RFSHCTL3.dis_au_refresh = 1
+		 *    - PWRCTL.powerdown_en = 0
+		 *    - DFIMISC.dfiinit_complete_en = 0
+		 */
+		stm32mp1_refresh_disable(priv->ctl);
 
-	/* 11. monitor PUB PGSR.IDONE to poll cpmpletion of training sequence */
-	stm32mp1_ddrphy_idone_wait(priv->phy);
+		/*
+		 *  9. Program PUBL PGCR to enable refresh during training
+		 *     and rank to train
+		 *     not done => keep the programed value in PGCR
+		 */
 
-	/*
-	 * 12. set back registers in step 8 to the orginal values if desidered
-	 */
-	stm32mp1_refresh_restore(priv->ctl, config->c_reg.rfshctl3,
-				 config->c_reg.pwrctl);
+		/*
+		 * 10. configure PUBL PIR register to specify which training
+		 *     step to run
+		 * Warning : RVTRN  is not supported by this PUBL
+		 */
+		stm32mp1_ddrphy_init(priv->phy, DDRPHYC_PIR_QSTRN);
+
+		/* 11. monitor PUB PGSR.IDONE to poll cpmpletion of training
+		 *     sequence
+		 */
+		stm32mp1_ddrphy_idone_wait(priv->phy);
+
+		/* Refresh compensation: forcing refresh command */
+		if (config->self_refresh) {
+			stm32mp1_refresh_compensation(config, priv->ctl, time);
+		}
+
+		/*
+		 * 12. set back registers in step 8 to the orginal values
+		 *     if desidered
+		 */
+		stm32mp1_refresh_restore(priv->ctl, config->c_reg.rfshctl3,
+					 config->c_reg.pwrctl);
+	}
 
 	/* Enable uMCTL2 AXI port 0 */
 	mmio_setbits_32((uintptr_t)&priv->ctl->pctrl_0,

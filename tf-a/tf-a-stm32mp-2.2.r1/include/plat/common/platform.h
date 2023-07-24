@@ -96,6 +96,11 @@ unsigned int plat_ic_get_interrupt_id(unsigned int raw);
  ******************************************************************************/
 uintptr_t plat_get_my_stack(void);
 void plat_report_exception(unsigned int exception_type);
+#if AARCH32_EXCEPTION_DEBUG
+void plat_report_undef_inst(unsigned int fault_address);
+void plat_report_prefetch_abort(unsigned int fault_address);
+void plat_report_data_abort(unsigned int fault_address);
+#endif
 int plat_crash_console_init(void);
 int plat_crash_console_putc(int c);
 int plat_crash_console_flush(void);
@@ -103,7 +108,7 @@ void plat_error_handler(int err) __dead2;
 void plat_panic_handler(void) __dead2;
 const char *plat_log_get_prefix(unsigned int log_level);
 void bl2_plat_preload_setup(void);
-int plat_try_next_boot_source(void);
+int plat_try_next_boot_source(unsigned int image_id);
 
 /*******************************************************************************
  * Mandatory BL1 functions

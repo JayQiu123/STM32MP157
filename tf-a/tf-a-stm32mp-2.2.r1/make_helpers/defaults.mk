@@ -106,6 +106,9 @@ ENABLE_BTI			:= 0
 # Use BRANCH_PROTECTION to enable PAUTH.
 ENABLE_PAUTH			:= 0
 
+# Flag to enable exception debug for AARCH32
+AARCH32_EXCEPTION_DEBUG		:= 0
+
 # Build flag to treat usage of deprecated platform and framework APIs as error.
 ERROR_DEPRECATED		:= 0
 

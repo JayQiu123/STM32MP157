@@ -254,6 +254,12 @@ void set_gpio(uint32_t bank, uint32_t pin, uint32_t mode, uint32_t speed,
 		mmio_read_32(base + GPIO_AFRH_OFFSET));
 
 	stm32mp_clk_disable(clock);
+
+	if (status == DT_SECURE) {
+		stm32mp_register_secure_gpio(bank, pin);
+	} else {
+		stm32mp_register_non_secure_gpio(bank, pin);
+	}
 }
 
 void set_gpio_secure_cfg(uint32_t bank, uint32_t pin, bool secure)
@@ -262,6 +268,8 @@ void set_gpio_secure_cfg(uint32_t bank, uint32_t pin, bool secure)
 	unsigned long clock = stm32_get_gpio_bank_clock(bank);
 
 	assert(pin <= GPIO_PIN_MAX);
+
+	assert(!(secure && stm32mp_gpio_bank_is_non_secure(bank)));
 
 	stm32mp_clk_enable(clock);
 
