@@ -9,7 +9,7 @@ cscope.*
 
 # Ignore build directory
 build/
-tf-a/build/
+../build/
 
 # Ignore build products from tools
 tools/**/*.o
