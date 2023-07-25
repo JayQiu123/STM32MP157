@@ -2,12 +2,14 @@
 cscope.*
 *.swp
 *.patch
+*.log
 *~
 .project
 .cproject
 
 # Ignore build directory
 build/
+tf-a/build/
 
 # Ignore build products from tools
 tools/**/*.o
