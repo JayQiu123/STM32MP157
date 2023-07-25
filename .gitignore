@@ -1,0 +1,37 @@
+# Ignore miscellaneous files
+cscope.*
+*.swp
+*.patch
+*.log
+*~
+.project
+.cproject
+
+# Ignore build directory
+tf-a/build/
+
+# Ignore build products from tf-a/tf-a-stm32mp-2.2.r1/tools
+tf-a/tf-a-stm32mp-2.2.r1/tools/**/*.o
+tf-a/tf-a-stm32mp-2.2.r1/tools/renesas/rcar_layout_create/*.bin
+tf-a/tf-a-stm32mp-2.2.r1/tools/renesas/rcar_layout_create/*.srec
+tf-a/tf-a-stm32mp-2.2.r1/tools/renesas/rcar_layout_create/*.map
+tf-a/tf-a-stm32mp-2.2.r1/tools/renesas/rcar_layout_create/*.elf
+tf-a/tf-a-stm32mp-2.2.r1/tools/fiptool/fiptool
+tf-a/tf-a-stm32mp-2.2.r1/tools/fiptool/fiptool.exe
+tf-a/tf-a-stm32mp-2.2.r1/tools/cert_create/src/*.o
+tf-a/tf-a-stm32mp-2.2.r1/tools/cert_create/src/**/*.o
+tf-a/tf-a-stm32mp-2.2.r1/tools/cert_create/cert_create
+tf-a/tf-a-stm32mp-2.2.r1/tools/cert_create/cert_create.exe
+tf-a/tf-a-stm32mp-2.2.r1/tools/marvell/doimage/doimage
+tf-a/tf-a-stm32mp-2.2.r1/tools/amlogic/doimage
+tf-a/tf-a-stm32mp-2.2.r1/tools/stm32image/*.o
+tf-a/tf-a-stm32mp-2.2.r1/tools/stm32image/stm32image
+tf-a/tf-a-stm32mp-2.2.r1/tools/stm32image/stm32image.exe
+tf-a/tf-a-stm32mp-2.2.r1/tools/sptool/sptool
+tf-a/tf-a-stm32mp-2.2.r1/tools/sptool/sptool.exe
+
+# GNU GLOBAL files
+GPATH
+GRTAGS
+GSYMS
+GTAGS
